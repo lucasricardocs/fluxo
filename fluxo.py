@@ -227,7 +227,7 @@ if uploaded_file:
         return pd.DataFrame(eventos)
 
     if uploaded_file:
-        eventos_df = detectar_eventos_adaptativo(df, limite_volume_inicial, fator_desvio_volume, janela_inicial, lookback_period_stats, st.sidebar.get_value("Janelas para extremos de preço"), st.sidebar.get_value("Percentual de proximidade do extremo"))
+        eventos_df = detectar_eventos_adaptativo(df, limite_volume_inicial, fator_desvio_volume, janela_inicial, lookback_period_stats, lookback_preco_extremos, pct_proximidade)
 
         st.subheader("📋 Eventos Detectados")
         if eventos_df.empty:
@@ -237,50 +237,50 @@ if uploaded_file:
 
             st.subheader("📈 Gráfico com Eventos (Altair)")
 
-            base = alt.Chart(df).mark_line(color='lightblue').encode(
-                x=alt.X('horario:T', title='Horário'),
-                y=alt.Y('preco:Q', title='Preço', scale=alt.Scale(zero=False)),
-                tooltip=['horario', 'preco', 'quantidade', 'agressor']
-            ).interactive()
+    base = alt.Chart(df).mark_line(color='lightblue').encode(
+        x=alt.X('horario:T', title='Horário'),
+        y=alt.Y('preco:Q', title='Preço', scale=alt.Scale(zero=False)),
+        tooltip=['horario', 'preco', 'quantidade', 'agressor']
+    ).interactive()
 
-            cores_eventos = {
-                'Absorção Passiva de Compra': 'darkblue',
-                'Absorção Passiva de Venda': 'darkred',
-                'Absorção Ativa de Compra': 'green',
-                'Absorção Ativa de Venda': 'orange',
-                'Reversão: Venda → Compra': 'purple',
-                'Reversão: Compra → Venda': 'brown',
-                'Rompimento de Topo': 'lime',
-                'Rompimento de Fundo': 'maroon',
-                'Potencial Inversão por Clímax de Absorção (Fundo)': 'mediumpurple',
-                'Potencial Inversão por Clímax de Absorção (Topo)': 'sienna'
-            }
+    cores_eventos = {
+        'Absorção Passiva de Compra': 'darkblue',
+        'Absorção Passiva de Venda': 'darkred',
+        'Absorção Ativa de Compra': 'green',
+        'Absorção Ativa de Venda': 'orange',
+        'Reversão: Venda → Compra': 'purple',
+        'Reversão: Compra → Venda': 'brown',
+        'Rompimento de Topo': 'lime',
+        'Rompimento de Fundo': 'maroon',
+        'Potencial Inversão por Clímax de Absorção (Fundo)': 'mediumpurple',
+        'Potencial Inversão por Clímax de Absorção (Topo)': 'sienna'
+    }
 
-            event_marks = alt.Chart(eventos_df).mark_rule(size=2, opacity=0.7).encode(
-                x='inicio:T',
-                color=alt.Color('tipo:N',
-                                scale=alt.Scale(domain=list(cores_eventos.keys()),
-                                                range=list(cores_eventos.values())),
-                legend=alt.Legend(title="Tipos de Evento")),
-                tooltip=['tipo', 'inicio', 'fim', 'preco_medio', 'volume_total', 'janela_usada', 'limite_vol_usado']
-            )
+    event_marks = alt.Chart(eventos_df).mark_rule(size=2, opacity=0.7).encode(
+        x='inicio:T',
+        color=alt.Color('tipo:N',
+                        scale=alt.Scale(domain=list(cores_eventos.keys()),
+                                        range=list(cores_eventos.values())),
+        legend=alt.Legend(title="Tipos de Evento")),
+        tooltip=['tipo', 'inicio', 'fim', 'preco_medio', 'volume_total', 'janela_usada', 'limite_vol_usado']
+    )
 
-            event_text = event_marks.mark_text(
-                align='left',
-                baseline='middle',
-                dx=7,
-                dy=-7,
-                angle=0
-            ).encode(
-                text='tipo:N'
-            )
+    event_text = event_marks.mark_text(
+        align='left',
+        baseline='middle',
+        dx=7,
+        dy=-7,
+        angle=0
+    ).encode(
+        text='tipo:N'
+    )
 
-            chart = (base + event_marks + event_text).properties(
-                width=700,
-                height=500,
-                title="Preços ao Longo do Tempo com Eventos Detectados"
-            )
-            st.altair_chart(chart, use_container_width=True)
+    chart = (base + event_marks + event_text).properties(
+        width=700,
+        height=500,
+        title="Preços ao Longo do Tempo com Eventos Detectados"
+    )
+    st.altair_chart(chart, use_container_width=True)
 
 else:
     st.info("ℹ️ Por favor, faça o upload de uma planilha Excel (.xlsx) para iniciar a análise.")
