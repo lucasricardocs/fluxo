@@ -25,7 +25,7 @@ if uploaded_file:
     except (ValueError, TypeError):
         # Fallback para formato específico se a conversão direta falhar
         df['horario'] = pd.to_datetime(df['horario'].astype(str), format="%H:%M:%S", errors='coerce')
-    
+
     df = df.dropna(subset=['horario']) # Remove linhas onde a conversão de horário falhou
     if 'agressor' in df.columns:
         df['agressor'] = df['agressor'].astype(str).str.lower() # Padroniza agressor para minúsculas
@@ -48,16 +48,16 @@ if uploaded_file:
         # Eles serão atualizados com os valores da *janela anterior* para avaliar rompimentos
         max_previa_historica = None
         min_previa_historica = None
-        
         limite_volume = limite_vol_inicial
         janela = jan_inicial
-        
+        evento_anterior = None # Variável para lembrar o tipo de evento anterior
+
         # O loop principal itera sobre o DataFrame, fatiando-o em 'trechos' (janelas)
         # O range vai até len(df_original) - janela para garantir que haja dados suficientes para a última janela
         for i in range(len(df_original) - janela + 1):
             if i + janela > len(df_original): # Se a janela adaptativa cresceu e ultrapassaria o fim
                 break
-                
+
             trecho = df_original.iloc[i:i+janela]
             if trecho.empty:
                 continue
@@ -82,34 +82,38 @@ if uploaded_file:
             modo_preco_vendedores = vendedores['preco'].mode()
             if not modo_preco_vendedores.empty and vol_venda_trecho > limite_volume and preco_min_trecho == modo_preco_vendedores.iloc[0]:
                 tipo_evento = 'Absorção Passiva de Compra'
-            
+
             modo_preco_compradores = compradores['preco'].mode()
             if not tipo_evento and not modo_preco_compradores.empty and vol_compra_trecho > limite_volume and preco_max_trecho == modo_preco_compradores.iloc[0]:
                 tipo_evento = 'Absorção Passiva de Venda'
-            
+
             # 2. Absorções Ativas
             if not tipo_evento and vol_compra_trecho > limite_volume and preco_max_trecho > trecho['preco'].iloc[0] and preco_max_trecho >= preco_max_trecho: # Compradores ativos elevando o preço dentro da janela
                 tipo_evento = 'Absorção Ativa de Compra'
-            
+
             if not tipo_evento and vol_venda_trecho > limite_volume and preco_min_trecho < trecho['preco'].iloc[0] and preco_min_trecho <= preco_min_trecho: # Vendedores ativos baixando o preço dentro da janela
                 tipo_evento = 'Absorção Ativa de Venda'
 
-            # 3. Reversões (baseadas na janela anterior)
-            if i >= janela: # Garante que existe uma janela anterior completa para comparação
+            # 3. Reversões (modificado para considerar o evento anterior)
+            if i >= janela:
                 trecho_anterior = df_original.iloc[i-janela:i]
                 if not trecho_anterior.empty:
                     vol_ant_compra = trecho_anterior[trecho_anterior['agressor'] == 'comprador']['quantidade'].sum()
                     vol_ant_venda = trecho_anterior[trecho_anterior['agressor'] == 'vendedor']['quantidade'].sum()
 
-                    if not tipo_evento and vol_ant_venda > limite_volume and vol_compra_trecho > limite_volume and vol_compra_trecho > vol_ant_venda:
+                    if not tipo_evento and evento_anterior == 'Absorção Passiva de Venda' and vol_compra_trecho > limite_volume * 0.8 and vol_compra_trecho > vol_ant_venda * 1.2: # Ajuste os multiplicadores conforme necessário
+                        tipo_evento = 'Reversão: Venda → Compra (Pós Absorção)'
+                    elif not tipo_evento and evento_anterior == 'Absorção Passiva de Compra' and vol_venda_trecho > limite_volume * 0.8 and vol_venda_trecho > vol_ant_compra * 1.2:
+                        tipo_evento = 'Reversão: Compra → Venda (Pós Absorção)'
+                    elif not tipo_evento and vol_ant_venda > limite_volume and vol_compra_trecho > limite_volume and vol_compra_trecho > vol_ant_venda:
                         tipo_evento = 'Reversão: Venda → Compra'
                     elif not tipo_evento and vol_ant_compra > limite_volume and vol_venda_trecho > limite_volume and vol_venda_trecho > vol_ant_compra:
                         tipo_evento = 'Reversão: Compra → Venda'
-            
+
             # 4. Rompimentos (baseados no histórico de máximas/mínimas)
             if not tipo_evento and max_previa_historica is not None and preco_max_trecho > max_previa_historica and vol_compra_trecho > limite_volume:
                 tipo_evento = 'Rompimento de Topo'
-            
+
             if not tipo_evento and min_previa_historica is not None and preco_min_trecho < min_previa_historica and vol_venda_trecho > limite_volume:
                 tipo_evento = 'Rompimento de Fundo'
 
@@ -134,7 +138,10 @@ if uploaded_file:
                     'janela_usada': janela,
                     'limite_vol_usado': round(limite_volume,0)
                 })
-            
+                evento_anterior = tipo_evento # Atualiza o tipo de evento anterior
+            else:
+                evento_anterior = None # Se nenhum evento for detectado, reseta
+
             # --- Ajuste Dinâmico da Janela e Limite de Volume ---
             # O ajuste é feito ao final da iteração, para valer para a próxima janela.
             nova_janela = janela
@@ -145,7 +152,7 @@ if uploaded_file:
                 # Série de volumes para calcular estatísticas (olhando para trás, excluindo a janela atual)
                 start_index_stats = max(0, i - lookback_stats) # Início do período de lookback
                 recent_volume_series = df_original['quantidade'].iloc[start_index_stats:i]
-                
+
                 if not recent_volume_series.empty:
                     vol_medio_recente = recent_volume_series.mean()
                     desvio_padrao_volume_recente = recent_volume_series.std()
@@ -176,7 +183,7 @@ if uploaded_file:
             else: # Ainda não há dados suficientes para o lookback completo
                 nova_janela = jan_inicial
                 novo_limite_volume = limite_vol_inicial
-            
+
             janela = nova_janela
             limite_volume = novo_limite_volume
 
@@ -208,28 +215,30 @@ if uploaded_file:
             'Reversão: Venda → Compra': 'purple',
             'Reversão: Compra → Venda': 'brown',
             'Rompimento de Topo': 'lime',
-            'Rompimento de Fundo': 'maroon'
+            'Rompimento de Fundo': 'maroon',
+            'Reversão: Venda → Compra (Pós Absorção)': 'mediumpurple',
+            'Reversão: Compra → Venda (Pós Absorção)': 'sienna'
         }
 
         # Criando marcações (regras verticais) para os eventos
         event_marks = alt.Chart(eventos_df).mark_rule(size=2, opacity=0.7).encode(
-            x='inicio:T', 
-            color=alt.Color('tipo:N', 
-                            scale=alt.Scale(domain=list(cores_eventos.keys()), 
+            x='inicio:T',
+            color=alt.Color('tipo:N',
+                            scale=alt.Scale(domain=list(cores_eventos.keys()),
                                             range=list(cores_eventos.values())),
                             legend=alt.Legend(title="Tipos de Evento")),
             tooltip=['tipo', 'inicio', 'fim', 'preco_medio', 'volume_total', 'janela_usada', 'limite_vol_usado']
         )
-        
+
         # Adicionando texto para os eventos (opcional, pode poluir o gráfico)
-        # Se não quiser os textos, comente o bloco 'event_text' abaixo 
+        # Se não quiser os textos, comente o bloco 'event_text' abaixo
         # e use a linha comentada na atribuição de 'chart'.
         event_text = event_marks.mark_text(
             align='left',
             baseline='middle',
-            dx=7,       # Pequeno deslocamento em X para não sobrepor a linha
+            dx=7,      # Pequeno deslocamento em X para não sobrepor a linha
             dy=-7,      # Pequeno deslocamento em Y para posicionar acima/diagonal à linha
-            angle=0     # Ângulo do texto (0 para horizontal)
+            angle=0      # Ângulo do texto (0 para horizontal)
         ).encode(
             text='tipo:N' # Mostra o tipo do evento como texto
         )
@@ -238,12 +247,12 @@ if uploaded_file:
         # Se não quiser os textos, comente a linha abaixo:
         chart = (base + event_marks + event_text).properties(
         # E descomente esta linha:
-        # chart = (base + event_marks).properties( 
-            width=700, 
+        # chart = (base + event_marks).properties(
+            width=700,
             height=500,
             title="Preços ao Longo do Tempo com Eventos Detectados"
         )
         st.altair_chart(chart, use_container_width=True)
 
 else:
-    st.info("ℹ️ Por favor, faça o upload de uma planilha Excel (.xlsx) para iniciar a análise.")
+    st.info("ℹ️ Por favor, faça o upload de uma planilha Excel (.xlsx) para
