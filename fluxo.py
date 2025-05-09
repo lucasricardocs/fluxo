@@ -208,14 +208,12 @@ if uploaded_file:
             'Reversão: Venda → Compra': 'purple',
             'Reversão: Compra → Venda': 'brown',
             'Rompimento de Topo': 'lime',
-            'Rompimento de Fundo': 'maroon' # ou um vermelho mais escuro
+            'Rompimento de Fundo': 'maroon'
         }
 
         # Criando marcações (regras verticais) para os eventos
-        # Usaremos 'rule' para linhas verticais que marcam o início do evento
         event_marks = alt.Chart(eventos_df).mark_rule(size=2, opacity=0.7).encode(
-            x='inicio:T', # Marca o início do evento
-            # x2='fim:T', # Descomente se quiser que a regra cubra o intervalo do evento
+            x='inicio:T', 
             color=alt.Color('tipo:N', 
                             scale=alt.Scale(domain=list(cores_eventos.keys()), 
                                             range=list(cores_eventos.values())),
@@ -224,19 +222,23 @@ if uploaded_file:
         )
         
         # Adicionando texto para os eventos (opcional, pode poluir o gráfico)
-         event_text = event_marks.mark_text(
-             align='left',
-             baseline='middle',
-             dx=5, # Deslocamento em X para não sobrepor a linha
-             dy=-10, # Deslocamento em Y
-             angle=270 # Texto vertical
-         ).encode(
-             text='tipo:N'
-         )
+        # Se não quiser os textos, comente o bloco 'event_text' abaixo 
+        # e use a linha comentada na atribuição de 'chart'.
+        event_text = event_marks.mark_text(
+            align='left',
+            baseline='middle',
+            dx=7,       # Pequeno deslocamento em X para não sobrepor a linha
+            dy=-7,      # Pequeno deslocamento em Y para posicionar acima/diagonal à linha
+            angle=0     # Ângulo do texto (0 para horizontal)
+        ).encode(
+            text='tipo:N' # Mostra o tipo do evento como texto
+        )
 
-        # Combinando o gráfico base com as marcações de eventos
-         chart = (base + event_marks + event_text).properties(
-        chart = (base + event_marks).properties(
+        # Combinando o gráfico base com as marcações de eventos e os textos
+        # Se não quiser os textos, comente a linha abaixo:
+        chart = (base + event_marks + event_text).properties(
+        # E descomente esta linha:
+        # chart = (base + event_marks).properties( 
             width=700, 
             height=500,
             title="Preços ao Longo do Tempo com Eventos Detectados"
