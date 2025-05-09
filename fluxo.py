@@ -3,21 +3,23 @@ import pandas as pd
 import altair as alt
 
 st.set_page_config(page_title="Detector de Fluxo - Times & Trades", layout="wide")
-st.title("📊 Detector de Absorções, Reversões e Rompimentos com Altair")
+st.title("📊 Detector de Absorções, Reversões e Rompimentos")
 st.markdown("Detecta **absorções**, **reversões** e **rompimentos** em dados de Times & Trades com visualização interativa.")
 
 uploaded_file = st.file_uploader("📎 Faça o upload da planilha (.xlsx)", type="xlsx")
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file)
-    df.columns = [col.strip().lower() for col in df.columns]
 
-    required_cols = {'horario', 'preco', 'quantidade', 'agressor'}
-    if not required_cols.issubset(df.columns):
-        st.error("❌ A planilha deve conter as colunas: 'horario', 'preco', 'quantidade' e 'agressor'.")
-        st.stop()
+    # Renomear colunas conforme a planilha
+    df = df.rename(columns={
+        'Data': 'horario',
+        'Valor': 'preco',
+        'Quantidade': 'quantidade',
+        'Agressor': 'agressor'
+    })
 
-    df['horario'] = pd.to_datetime(df['horario'])
+    df['horario'] = pd.to_datetime(df['horario'].astype(str), format="%H:%M:%S")
 
     st.success("✅ Planilha carregada com sucesso!")
 
@@ -32,8 +34,8 @@ if uploaded_file:
 
         for i in range(len(df) - janela):
             trecho = df.iloc[i:i+janela]
-            compradores = trecho[trecho['agressor'].str.lower() == 'compra']
-            vendedores = trecho[trecho['agressor'].str.lower() == 'venda']
+            compradores = trecho[trecho['agressor'].str.lower() == 'comprador']
+            vendedores = trecho[trecho['agressor'].str.lower() == 'vendedor']
 
             preco_max = trecho['preco'].max()
             preco_min = trecho['preco'].min()
@@ -55,8 +57,8 @@ if uploaded_file:
 
             trecho_ant = df.iloc[i-janela:i] if i >= janela else None
             if trecho_ant is not None:
-                vol_ant_compra = trecho_ant[trecho_ant['agressor'].str.lower() == 'compra']['quantidade'].sum()
-                vol_ant_venda = trecho_ant[trecho_ant['agressor'].str.lower() == 'venda']['quantidade'].sum()
+                vol_ant_compra = trecho_ant[trecho_ant['agressor'].str.lower() == 'comprador']['quantidade'].sum()
+                vol_ant_venda = trecho_ant[trecho_ant['agressor'].str.lower() == 'vendedor']['quantidade'].sum()
                 if vol_ant_venda > limite_volume and vol_compra > limite_volume:
                     tipo = 'Reversão: Venda → Compra'
                 elif vol_ant_compra > limite_volume and vol_venda > limite_volume:
@@ -89,8 +91,7 @@ if uploaded_file:
     else:
         st.dataframe(eventos_df)
 
-        # Gráfico com Altair
-        st.subheader("📈 Gráfico Interativo com Eventos")
+        st.subheader("📈 Gráfico com Eventos (Altair)")
 
         base = alt.Chart(df).mark_line(color='gray').encode(
             x=alt.X('horario:T', title='Horário'),
