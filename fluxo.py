@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
-st.set_page_config(page_title="Detector de Fluxo - Times & Trades", layout="wide")
+st.set_page_config(page_title="Detector de Fluxo - Times & Trades", layout="centered")
 st.title("📊 Detector de Absorções, Reversões e Rompimentos")
 st.markdown("Detecta **absorções**, **reversões** e **rompimentos** em dados de Times & Trades com visualização interativa.")
 
