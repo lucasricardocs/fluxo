@@ -135,11 +135,11 @@ if uploaded_file:
 
                     if proximo_fundo and len(absorcoes_recentes) >= 2:
                         tipos_absorcao = [a['tipo'] for a in absorcoes_recentes[-2:]]
-                        if all('Venda' in tipo for tipo in tipos_absorcao) and 'Compra' in tipo_evento and vol_compra_trecho > limite_volume * 0.8 and len(absorcoes_recentes) > 0 and abs(absorcoes_recentes[-1]['indice'] - i) < 2 * janela:
+                        if all('Venda' in tipo for tipo in tipos_absorcao) and 'Compra' in tipo_evento and vol_compra_trecho > limite_volume * 0.8 and len(absorcoes_recentes) > 0 and isinstance(absorcoes_recentes[-1].get('indice'), (int, float)) and abs(absorcoes_recentes[-1]['indice'] - i) < 2 * janela:
                             tipo_evento = 'Potencial Inversão por Clímax de Absorção (Fundo)'
                     elif proximo_topo and len(absorcoes_recentes) >= 2:
                         tipos_absorcao = [a['tipo'] for a in absorcoes_recentes[-2:]]
-                        if all('Compra' in tipo for tipo in tipos_absorcao) and 'Venda' in tipo_evento and vol_venda_trecho > limite_volume * 0.8 and len(absorcoes_recentes) > 0 and abs(absorcoes_recentes[-1]['indice'] - i) < 2 * janela:
+                        if all('Compra' in tipo for tipo in tipos_absorcao) and 'Venda' in tipo_evento and vol_venda_trecho > limite_volume * 0.8 and len(absorcoes_recentes) > 0 and isinstance(absorcoes_recentes[-1].get('indice'), (int, float)) and abs(absorcoes_recentes[-1]['indice'] - i) < 2 * janela:
                             tipo_evento = 'Potencial Inversão por Clímax de Absorção (Topo)'
 
             # 3. Reversões (com prioridade menor que clímax de absorção)
